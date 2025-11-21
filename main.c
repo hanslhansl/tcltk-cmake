@@ -14,7 +14,7 @@ int HelloCmd(ClientData clientData, Tcl_Interp *interp, int argc, const char *ar
     return TCL_OK;
 }
 
-int main(int argc, char *argv[]) {
+int main2(int argc, char *argv[]) {
     // Create a Tcl interpreter
     Tcl_FindExecutable(argv[0]);
 
@@ -43,8 +43,9 @@ int main(int argc, char *argv[]) {
 }
 
 
-/*#include <tk.h>
+#include <tk.h>
 
+// /*
 int main(int argc, char *argv[]) {
     // Create a Tcl interpreter
     Tcl_FindExecutable(argv[0]);
@@ -71,5 +72,6 @@ int main(int argc, char *argv[]) {
     Tk_MainLoop();
 
     return 0;
-}*/
+}
+// */
 

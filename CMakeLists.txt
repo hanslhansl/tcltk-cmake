@@ -1,4 +1,5 @@
 include(ExternalProject)
+include(cmake/import_external_libs.cmake)
 
 cmake_minimum_required(VERSION 4.0.0 FATAL_ERROR)
 project(tcltk_cmake LANGUAGES C)
@@ -72,7 +73,7 @@ if (PLATFORM STREQUAL "MSVC")
 elseif(PLATFORM STREQUAL "MINGW")
 endif()
 
-# Set up build instructions for static / shared
+#[[ Set up build instructions for static / shared
 if (TCLTK_STATIC)
     set(LIBRARY_TYPE "STATIC")
 
@@ -113,7 +114,7 @@ else()
     foreach(item IN LISTS TK_IMPORTED_IMPLIBS)
         list(APPEND TK_FULL_IMPORTED_IMPLIBS "${TK_ROOT}/lib/${item}${CMAKE_STATIC_LIBRARY_SUFFIX}")
     endforeach()
-endif()
+endif()]]
 
 # Download and build tcl
 ExternalProject_Add(tcl_project
@@ -131,30 +132,22 @@ ExternalProject_Add(tcl_project
 
     INSTALL_COMMAND     "${TCL_INSTALL_COMMAND}"
 
-    BUILD_BYPRODUCTS ${TCL_FULL_IMPORTED_LOCATIONS} ${TCL_FULL_IMPORTED_IMPLIBS}
+    #BUILD_BYPRODUCTS ${TCL_FULL_IMPORTED_LOCATIONS} ${TCL_FULL_IMPORTED_IMPLIBS}
+    #BUILD_BYPRODUCTS ${TCL_ROOT}/lib/* ${TCL_ROOT}/bin/*
 )
 ExternalProject_Get_Property(tcl_project SOURCE_DIR)
 set(TCL_SOURCE_DIR "${SOURCE_DIR}")
 
-message(STATUS "${TCL_FULL_IMPORTED_LOCATIONS}")
-
 # Import libraries created by tcl
-list(LENGTH TCL_IMPORTED_LOCATIONS len)
-set(TCL_IMPORTED_LIBRARIES "")
-foreach(LIB_NAME LIB_PATH IMP_LIB_PATH IN ZIP_LISTS TCL_IMPORTED_LOCATIONS TCL_FULL_IMPORTED_LOCATIONS TCL_FULL_IMPORTED_IMPLIBS)
-    add_library(${LIB_NAME} ${LIBRARY_TYPE} IMPORTED)
-    set_target_properties(${LIB_NAME} PROPERTIES
-        IMPORTED_LOCATION   "${LIB_PATH}"
-        IMPORTED_IMPLIB     "${IMP_LIB_PATH}"
-    )
-    add_dependencies(${LIB_NAME} tcl_project)
-    list(APPEND TCL_IMPORTED_LIBRARIES ${LIB_NAME})
-endforeach()
-
-# Merge imported tcl libraries into a single interface library
-add_library(tcl INTERFACE)
-add_dependencies(tcl tcl_project)
-target_link_libraries(tcl INTERFACE ${TCL_IMPORTED_LIBRARIES})
+import_external_libs(
+    TARGET        tcl
+    DEPENDS       tcl_project
+    LIB_PATHS     "${TCL_ROOT}/lib"
+    DLL_PATHS     "${TCL_ROOT}/bin"
+    LIB_PATTERNS  "*.lib" "*.a"
+    DLL_PATTERNS  "*.dll"
+    VERBOSE       ON
+)
 target_include_directories(tcl INTERFACE ${TCL_ROOT}/include)
 
 if(TCLTK_BUILD_TK)
@@ -174,33 +167,27 @@ if(TCLTK_BUILD_TK)
 
         INSTALL_COMMAND     "${TK_INSTALL_COMMAND}"
 
-        BUILD_BYPRODUCTS    ${TK_FULL_IMPORTED_LOCATIONS} ${TK_FULL_IMPORTED_IMPLIBS}
+        #BUILD_BYPRODUCTS    ${TK_FULL_IMPORTED_LOCATIONS} ${TK_FULL_IMPORTED_IMPLIBS}
+        #BUILD_BYPRODUCTS ${TK_ROOT}/lib/*.* ${TK_ROOT}/bin/*.*
         DEPENDS             tcl_project
     )
 
     # Import libraries created by tk
-    list(LENGTH TK_IMPORTED_LOCATIONS len)
-    set(TK_IMPORTED_LIBRARIES "")
-    foreach(LIB_NAME LIB_PATH IMP_LIB_PATH IN ZIP_LISTS TK_IMPORTED_LOCATIONS TK_FULL_IMPORTED_LOCATIONS TK_FULL_IMPORTED_IMPLIBS)
-        add_library(${LIB_NAME} ${LIBRARY_TYPE} IMPORTED)
-        set_target_properties(${LIB_NAME} PROPERTIES
-            IMPORTED_LOCATION   "${LIB_PATH}"
-            IMPORTED_IMPLIB     "${IMP_LIB_PATH}"
-        )
-        add_dependencies(${LIB_NAME} tk_project)
-        list(APPEND TK_IMPORTED_LIBRARIES ${LIB_NAME})
-    endforeach()
-
-    # Merge imported tk libraries into a single interface library
-    add_library(tk INTERFACE)
-    add_dependencies(tk tk_project)
-    target_link_libraries(tk INTERFACE ${TK_IMPORTED_LIBRARIES})
+    import_external_libs(
+        TARGET        tk
+        DEPENDS       tk_project
+        LIB_PATHS     "${TK_ROOT}/lib"
+        DLL_PATHS     "${TK_ROOT}/bin"
+        LIB_PATTERNS  "*.lib" "*.a"
+        DLL_PATTERNS  "*.dll"
+        VERBOSE       ON
+    )
     target_include_directories(tk INTERFACE ${TK_ROOT}/include)
 endif()
 
-# [[ Example usage
+#  Example usage
 add_executable(test main.c)
-target_link_libraries(test PUBLIC tcl )#tk
+target_link_libraries(test PUBLIC tcl tk)
 
 # copy dlls
 if(CMAKE_IMPORT_LIBRARY_SUFFIX)
