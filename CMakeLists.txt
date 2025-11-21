@@ -5,6 +5,9 @@ project(tcltk_cmake LANGUAGES C)
 
 # Build options
 option(TCLTK_STATIC "Build tcl/tk as static library" OFF)
+option(TCLTK_PDBS "Build tcl/tk with debugging symbols" ON)
+option(TCLTK_BUILD_TK "Build tk" ON)
+
 set(TCL_ROOT ${CMAKE_BINARY_DIR}/tcl_project)
 set(TK_ROOT ${CMAKE_BINARY_DIR}/tk_project)
 
@@ -38,19 +41,30 @@ endif()
 
 # Set up build commands and imported libraries based compiler/platform
 if (PLATFORM STREQUAL "MSVC")
+    set(OPTS "")
+    if (TCLTK_PDBS)
+        list(APPEND OPTS "pdbs")
+    endif()
+    if (TCLTK_STATIC)
+        list(APPEND OPTS "static")
+    endif()
+    list(JOIN OPTS "," OPTS)
+
     set(TCL_CONFIGURE_COMMAND   "")
-    #set(TCL_BUILD_COMMAND       cd win && nmake -f makefile.vc release OPTS=pdbs)
+    #set(TCL_BUILD_COMMAND       cd win && nmake -f makefile.vc release OPTS=${OPTS})
     #set(TCL_INSTALL_COMMAND     cd win && nmake -f makefile.vc install INSTALLDIR=<INSTALL_DIR>)
-    set(TCL_BUILD_COMMAND       cd win && nmake -f makefile.vc release OPTS=pdbs && nmake -f makefile.vc install INSTALLDIR=<INSTALL_DIR>)
+    #set(TCL_BUILD_COMMAND       cd win && nmake -f makefile.vc release OPTS=${OPTS} && nmake -f makefile.vc install INSTALLDIR=<INSTALL_DIR>)
+    set(TCL_BUILD_COMMAND       cd win && nmake -f makefile.vc release install OPTS=${OPTS} INSTALLDIR=<INSTALL_DIR>)
     set(TCL_INSTALL_COMMAND     "")
 
     set(TCL_IMPORTED_LOCATIONS  libtommath tcl91 zlib1)
     set(TCL_IMPORTED_IMPLIBS    tommath tcl91 zdll)
 
     set(TK_CONFIGURE_COMMAND   "")
-    #set(TK_BUILD_COMMAND       cd win && nmake -f makefile.vc release TCLDIR=${TCL_ROOT}/src/tcl_project OPTS=pdbs)
+    #set(TK_BUILD_COMMAND       cd win && nmake -f makefile.vc release TCLDIR=${TCL_ROOT}/src/tcl_project OPTS=${OPTS})
     #set(TK_INSTALL_COMMAND     cd win && nmake -f makefile.vc install TCLDIR=${TCL_ROOT}/src/tcl_project INSTALLDIR=<INSTALL_DIR>)
-    set(TK_BUILD_COMMAND       cd win && nmake -f makefile.vc release TCLDIR=${TCL_ROOT}/src/tcl_project OPTS=pdbs && nmake -f makefile.vc install TCLDIR=${TCL_ROOT}/src/tcl_project INSTALLDIR=<INSTALL_DIR>)
+    #set(TK_BUILD_COMMAND       cd win && nmake -f makefile.vc release TCLDIR=${TCL_ROOT}/src/tcl_project OPTS=${OPTS} && nmake -f makefile.vc install TCLDIR=${TCL_ROOT}/src/tcl_project INSTALLDIR=<INSTALL_DIR>)
+    set(TK_BUILD_COMMAND        cd win && nmake -f makefile.vc release install OPTS=${OPTS} INSTALLDIR=<INSTALL_DIR> TCLDIR=${TCL_ROOT}/src/tcl_project)
     set(TK_INSTALL_COMMAND     "")
 
     set(TK_IMPORTED_LOCATIONS   tcl9tk91)
@@ -64,7 +78,7 @@ if (TCLTK_STATIC)
 
     set(TCL_FULL_IMPORTED_LOCATIONS "")
     foreach(item IN LISTS TCL_IMPORTED_LOCATIONS)
-        list(APPEND TCL_FULL_IMPORTED_LOCATIONS "${TCL_ROOT}/bin/${item}s${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        list(APPEND TCL_FULL_IMPORTED_LOCATIONS "${TCL_ROOT}/lib/${item}s${CMAKE_STATIC_LIBRARY_SUFFIX}")
     endforeach()
     set(TCL_FULL_IMPORTED_IMPLIBS "")
     foreach(item IN LISTS TCL_IMPORTED_IMPLIBS)
@@ -73,7 +87,7 @@ if (TCLTK_STATIC)
 
     set(TK_FULL_IMPORTED_LOCATIONS "")
     foreach(item IN LISTS TK_IMPORTED_LOCATIONS)
-        list(APPEND TK_FULL_IMPORTED_LOCATIONS "${TK_ROOT}/bin/${item}s${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        list(APPEND TK_FULL_IMPORTED_LOCATIONS "${TK_ROOT}/lib/${item}s${CMAKE_STATIC_LIBRARY_SUFFIX}")
     endforeach()
     set(TK_FULL_IMPORTED_IMPLIBS "")
     foreach(item IN LISTS TK_IMPORTED_IMPLIBS)
@@ -143,48 +157,50 @@ add_dependencies(tcl tcl_project)
 target_link_libraries(tcl INTERFACE ${TCL_IMPORTED_LIBRARIES})
 target_include_directories(tcl INTERFACE ${TCL_ROOT}/include)
 
-# Download and build tk
-ExternalProject_Add(tk_project
-    PREFIX              ${TK_ROOT}
+if(TCLTK_BUILD_TK)
+    # Download and build tk
+    ExternalProject_Add(tk_project
+        PREFIX              ${TK_ROOT}
 
-    GIT_REPOSITORY      https://github.com/tcltk/tk.git
-    GIT_TAG             main
-    GIT_PROGRESS        ON
-    GIT_SHALLOW         ON
+        GIT_REPOSITORY      https://github.com/tcltk/tk.git
+        GIT_TAG             main
+        GIT_PROGRESS        ON
+        GIT_SHALLOW         ON
 
-    CONFIGURE_COMMAND   "${TK_CONFIGURE_COMMAND}"
+        CONFIGURE_COMMAND   "${TK_CONFIGURE_COMMAND}"
 
-    BUILD_IN_SOURCE     1
-    BUILD_COMMAND       "${TK_BUILD_COMMAND}"
+        BUILD_IN_SOURCE     1
+        BUILD_COMMAND       "${TK_BUILD_COMMAND}"
 
-    INSTALL_COMMAND     "${TK_INSTALL_COMMAND}"
+        INSTALL_COMMAND     "${TK_INSTALL_COMMAND}"
 
-    BUILD_BYPRODUCTS    ${TK_FULL_IMPORTED_LOCATIONS} ${TK_FULL_IMPORTED_IMPLIBS}
-    DEPENDS             tcl_project
-)
-
-# Import libraries created by tk
-list(LENGTH TK_IMPORTED_LOCATIONS len)
-set(TK_IMPORTED_LIBRARIES "")
-foreach(LIB_NAME LIB_PATH IMP_LIB_PATH IN ZIP_LISTS TK_IMPORTED_LOCATIONS TK_FULL_IMPORTED_LOCATIONS TK_FULL_IMPORTED_IMPLIBS)
-    add_library(${LIB_NAME} ${LIBRARY_TYPE} IMPORTED)
-    set_target_properties(${LIB_NAME} PROPERTIES
-        IMPORTED_LOCATION   "${LIB_PATH}"
-        IMPORTED_IMPLIB     "${IMP_LIB_PATH}"
+        BUILD_BYPRODUCTS    ${TK_FULL_IMPORTED_LOCATIONS} ${TK_FULL_IMPORTED_IMPLIBS}
+        DEPENDS             tcl_project
     )
-    add_dependencies(${LIB_NAME} tk_project)
-    list(APPEND TK_IMPORTED_LIBRARIES ${LIB_NAME})
-endforeach()
 
-# Merge imported tk libraries into a single interface library
-add_library(tk INTERFACE)
-add_dependencies(tk tk_project)
-target_link_libraries(tk INTERFACE ${TK_IMPORTED_LIBRARIES})
-target_include_directories(tk INTERFACE ${TK_ROOT}/include)
+    # Import libraries created by tk
+    list(LENGTH TK_IMPORTED_LOCATIONS len)
+    set(TK_IMPORTED_LIBRARIES "")
+    foreach(LIB_NAME LIB_PATH IMP_LIB_PATH IN ZIP_LISTS TK_IMPORTED_LOCATIONS TK_FULL_IMPORTED_LOCATIONS TK_FULL_IMPORTED_IMPLIBS)
+        add_library(${LIB_NAME} ${LIBRARY_TYPE} IMPORTED)
+        set_target_properties(${LIB_NAME} PROPERTIES
+            IMPORTED_LOCATION   "${LIB_PATH}"
+            IMPORTED_IMPLIB     "${IMP_LIB_PATH}"
+        )
+        add_dependencies(${LIB_NAME} tk_project)
+        list(APPEND TK_IMPORTED_LIBRARIES ${LIB_NAME})
+    endforeach()
 
-#[[ Example usage
+    # Merge imported tk libraries into a single interface library
+    add_library(tk INTERFACE)
+    add_dependencies(tk tk_project)
+    target_link_libraries(tk INTERFACE ${TK_IMPORTED_LIBRARIES})
+    target_include_directories(tk INTERFACE ${TK_ROOT}/include)
+endif()
+
+# [[ Example usage
 add_executable(test main.c)
-target_link_libraries(test PUBLIC tcl tk)
+target_link_libraries(test PUBLIC tcl )#tk
 
 # copy dlls
 if(CMAKE_IMPORT_LIBRARY_SUFFIX)
